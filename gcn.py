@@ -27,10 +27,10 @@ class GCNlayer(nn.Module):
         with g.local_scope():
             g.ndata['h'] = feature
             g.update_all(self.gcn_msg,self.gcn_reduce)
-            h = g.ndata['h']  # h size is
-            print(h.shape)
+            h = g.ndata['h']  # h size is[2708, 每一层的size】
+            # print(h.shape)
             res = self.Linear(h)
-            print(res.shape)
+            # print(res.shape)
             return res
 
 
@@ -46,6 +46,7 @@ class GCN( nn.Module ):
                  ):
         super( GCN, self ).__init__()
         self.g = g
+        self.n_layers = n_layers
         # self.layers = nn.ModuleList()
         # # 输入层
         # self.layers.append( GCNlayer( in_feats, n_hidden ))
@@ -55,14 +56,17 @@ class GCN( nn.Module ):
         # # 输出层
         # self.layers.append( GCNlayer( n_hidden, n_classes ) )
         self.GCN_layer1 = GCNlayer(in_feats, n_hidden)
+
         self.GCN_layer2 = GCNlayer(n_hidden, n_hidden)
         self.GCN_layer3 = GCNlayer(n_hidden, n_classes)
 
-        # self.dropout = nn.Dropout(p = dropout)
+        self.dropout = nn.Dropout(p = dropout)
 
     def forward( self,g, features ):
         x = F.relu(self.GCN_layer1(g,features))
-        x = F.relu(self.GCN_layer2(g,x))
+        for i in range(self.n_layers - 2):
+            x = F.relu(self.GCN_layer2(g,x))
+            x = self.dropout(x)
         x = F.relu(self.GCN_layer3(g,x))
         return x
 
@@ -86,7 +90,7 @@ def evaluate(model, g, features, labels, mask):
         correct = torch.sum(indices == labels)
         return correct.item() * 1.0 / len(labels)
 
-def train(n_epochs=100, lr=1e-2, weight_decay=5e-4, n_hidden=16, n_layers=1, activation=F.relu , dropout=0.5):
+def train(n_epochs=300, lr=1e-2, weight_decay=5e-4, n_hidden=16, n_layers=5, activation=F.relu , dropout=0.5):
     data = CoraGraphDataset()
     # 该数据集用于semi-supervised的节点分类任务
 
